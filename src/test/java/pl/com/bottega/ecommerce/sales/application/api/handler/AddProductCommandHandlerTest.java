@@ -55,6 +55,38 @@ public class AddProductCommandHandlerTest {
         verify(reservationRepository, times(1)).save(any(Reservation.class));
 
     }
+    
 
+    @Test
+    public void shouldSuggestDifferentProductIfOneIsNotAvailable() {
+
+        AddProductCommandHandler handler = new AddProductCommandHandler();
+        Product productSuggested = new Product(new Id("1"), new Money(10), "myProduct", ProductType.STANDARD);
+        Product productWanted = spy(new Product(new Id("2"), new Money(12), "betterProduct", ProductType.STANDARD));
+        when(productWanted.isAvailable()).thenReturn(false);
+        Client client = mock(Client.class);
+        Reservation reservation = mock(Reservation.class);
+
+        ClientRepository clientRepository = mock(ClientRepository.class);
+        ReservationRepository reservationRepository = mock(ReservationRepository.class);
+        ProductRepository productRepository = mock(ProductRepository.class);
+        SuggestionService suggestionService = mock(SuggestionService.class);
+        SystemContext systemContext = new SystemContext();
+        Whitebox.setInternalState(handler, "clientRepository", clientRepository);
+        Whitebox.setInternalState(handler, "reservationRepository", reservationRepository);
+        Whitebox.setInternalState(handler, "productRepository", productRepository);
+        Whitebox.setInternalState(handler, "suggestionService", suggestionService);
+        Whitebox.setInternalState(handler, "systemContext", systemContext);
+
+        AddProductCommand command = new AddProductCommand(new Id("1"), new Id("2"), 1);
+        when(clientRepository.load(any(Id.class))).thenReturn(client);
+        when(reservationRepository.load(command.getOrderId())).thenReturn(reservation);
+        when(productRepository.load(command.getProductId())).thenReturn(productWanted);
+        when(suggestionService.suggestEquivalent(productWanted, client)).thenReturn(productSuggested);
+        when(productWanted.isAvailable()).thenReturn(false);
+
+        handler.handle(command);
+        verify(suggestionService, times(1)).suggestEquivalent(productWanted, client);
+    }
 
 }
