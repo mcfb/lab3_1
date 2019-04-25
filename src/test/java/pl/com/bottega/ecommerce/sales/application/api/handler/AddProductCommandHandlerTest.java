@@ -1,8 +1,10 @@
 package pl.com.bottega.ecommerce.sales.application.api.handler;
 
+import org.hamcrest.Matchers;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.internal.util.reflection.Whitebox;
+import pl.com.bottega.ddd.support.domain.BaseAggregateRoot;
 import pl.com.bottega.ecommerce.canonicalmodel.publishedlanguage.ClientData;
 import pl.com.bottega.ecommerce.canonicalmodel.publishedlanguage.Id;
 import pl.com.bottega.ecommerce.sales.application.api.command.AddProductCommand;
@@ -60,12 +62,19 @@ public class AddProductCommandHandlerTest {
     @Test
     public void shouldSuggestDifferentProductIfOneIsNotAvailable() {
 
+
         AddProductCommandHandler handler = new AddProductCommandHandler();
-        Product productSuggested = new Product(new Id("1"), new Money(10), "myProduct", ProductType.STANDARD);
-        Product productWanted = spy(new Product(new Id("2"), new Money(12), "betterProduct", ProductType.STANDARD));
-        when(productWanted.isAvailable()).thenReturn(false);
-        Client client = mock(Client.class);
-        Reservation reservation = mock(Reservation.class);
+        Product productWanted = new Product(new Id("1"), new Money(12), "betterProduct", ProductType.STANDARD);
+        Product productSuggested = new Product(new Id("2"), new Money(10), "myProduct", ProductType.STANDARD);
+        productWanted.markAsRemoved();
+        assertThat(productWanted.isAvailable(), Matchers.equalTo(false));
+
+        Client client = new Client();
+        ClientData clientData = new ClientData(Id.generate(), "Klient1");
+        Reservation reservation = new Reservation(Id.generate(), Reservation.ReservationStatus.OPENED,
+                clientData, new Date());
+
+
 
         ClientRepository clientRepository = mock(ClientRepository.class);
         ReservationRepository reservationRepository = mock(ReservationRepository.class);
@@ -78,12 +87,11 @@ public class AddProductCommandHandlerTest {
         Whitebox.setInternalState(handler, "suggestionService", suggestionService);
         Whitebox.setInternalState(handler, "systemContext", systemContext);
 
-        AddProductCommand command = new AddProductCommand(new Id("1"), new Id("2"), 1);
+        AddProductCommand command = new AddProductCommand(new Id("1"), new Id("1"), 1);
         when(clientRepository.load(any(Id.class))).thenReturn(client);
         when(reservationRepository.load(command.getOrderId())).thenReturn(reservation);
         when(productRepository.load(command.getProductId())).thenReturn(productWanted);
         when(suggestionService.suggestEquivalent(productWanted, client)).thenReturn(productSuggested);
-        when(productWanted.isAvailable()).thenReturn(false);
 
         handler.handle(command);
         verify(suggestionService, times(1)).suggestEquivalent(productWanted, client);
